@@ -31,7 +31,7 @@ module Lightning
       prefix, amount, multiplier = parse_human_readable(human)
       message = Message.new
       message.prefix = prefix
-      message.amount = amount
+      message.amount = amount.to_i
       message.multiplier = multiplier
       message.timestamp =
         (data_part[0] << 30) |
