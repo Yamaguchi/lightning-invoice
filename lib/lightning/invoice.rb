@@ -33,14 +33,7 @@ module Lightning
       message.prefix = prefix
       message.amount = amount.to_i
       message.multiplier = multiplier
-      message.timestamp =
-        (data_part[0] << 30) |
-        (data_part[1] << 25) |
-        (data_part[2] << 20) |
-        (data_part[3] << 15) |
-        (data_part[4] << 10) |
-        (data_part[5] <<  5) |
-        data_part[6]
+      message.timestamp = to_int(data_part[0...7])
       tags = data_part[7...data_part.size - 104]
       index = 0
       while index < tags.size
