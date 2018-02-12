@@ -5,11 +5,52 @@ RSpec.describe Lightning::Invoice do
     expect(Lightning::Invoice::VERSION).not_to be nil
   end
 
-  describe '.parse' do
-    before do
-      Bitcoin.chain_params = network
+  before do
+    Bitcoin.chain_params = network
+  end
+  let(:network) { :mainnet }
+  
+  describe '.to_bech32' do
+    let(:prefix) { 'lnbc' }
+    let(:amount) { 2500 }
+    let(:multiplier) { 'm' }
+    let(:timestamp) { 1496314658 }
+    let(:payment_hash) { '0001020304050607080900010203040506070809000102030405060708090102' }
+    let(:description) { 'Please consider supporting this project' }
+    let(:expiry) { 60 }
+    let(:signature) { '38ec6891345e204145be8a3a99de38e98a39d6a569434e1845c8af7205afcfcc7f425fcd1463e93c32881ead0d6e356d467ec8c02553f9aab15e5738b11f127f00' }
+    let(:message) do
+      Lightning::Invoice::Message.new.tap do |m|
+        m.prefix = prefix
+        m.amount = amount
+        m.multiplier = multiplier
+        m.timestamp = timestamp
+        m.payment_hash = payment_hash.htb
+        m.description = description
+        m.expiry = expiry
+        m.fallback_address = fallback_address
+        m.signature = signature.htb
+      end
     end
-    let(:network) { :mainnet }
+    subject { described_class.parse(message.to_bech32).to_h }
+    context 'address is P2WPKH' do
+      let(:fallback_address) { 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4' }
+      it { is_expected.to eq message.to_h }
+    end
+    context 'address is P2WSH' do
+      let(:fallback_address) { 'bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3' }
+      it { is_expected.to eq message.to_h }
+    end
+    context 'address is P2PKH' do
+      let(:fallback_address) { '1RustyRX2oai4EYYDpQGWvEL62BBGqN9T' }
+      it { is_expected.to eq message.to_h }
+    end
+    context 'address is P2SH' do
+      let(:fallback_address) { '3EktnHQD7RiAE6uzMj2ZifT9YgRrkSgzQX' }
+      it { is_expected.to eq message.to_h }
+    end
+  end
+  describe '.parse' do
     let(:hash) do
       Bitcoin.sha256('One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon').bth
     end

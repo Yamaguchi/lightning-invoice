@@ -15,13 +15,94 @@ module Lightning
       attr_accessor :timestamp, :signature, :payment_hash, :description, :pubkey, :description_hash, :expiry, :min_final_cltv_expiry, :fallback_address, :routing_info
 
       def initialize
+        @amount = -1
+        @timestamp = 0
         @expiry = 3600
         @min_final_cltv_expiry = 9
         @routing_info = []
       end
 
       def to_bech32
+        human = +''
+        human << prefix
+        human << amount.to_s if amount && amount > 0
+        human << multiplier if multiplier
+        data = []
+        data += Invoice.int_to_array(timestamp)
+        if payment_hash
+          data += [1]
+          data += [1, 20]
+          data += Invoice.buffer_to_word(payment_hash)
+        end
+        if description
+          data += [13]
+          description_word = Invoice.buffer_to_word(description)
+          data += Invoice.int_to_array(description_word.size)
+          data += description_word
+        end
+        if pubkey
+          data += [19]
+          data += [1, 21]
+          data += Invoice.buffer_to_word(pubkey)
+        end
+        if description_hash
+          data += [23]
+          data += [1, 20]
+          data += Invoice.buffer_to_word(description_hash)
+        end
+        if expiry && expiry != 3600
+          data += [6]
+          expiry_word = Invoice.int_to_array(expiry)
+          data += Invoice.int_to_array(expiry_word.size)
+          data += expiry_word
+        end
+        if min_final_cltv_expiry && min_final_cltv_expiry != 9
+          data += [24]
+          min_final_cltv_expiry_word = Invoice.int_to_array(min_final_cltv_expiry)
+          data += Invoice.int_to_array(min_final_cltv_expiry_word.size)
+          data += min_final_cltv_expiry_word
+        end
+        if fallback_address
+          data += [9]
+          type = fallback_address_type(fallback_address)
+          case type
+          when 0
+            _, data_part = Bech32.decode(fallback_address)
+            data += Invoice.int_to_array(data_part.size + 1)
+            data += data_part
+          when 17, 18
+            decoded = Bitcoin::Base58.decode(fallback_address)
+            decoded = decoded.htb[1...-4]
+            decoded = Invoice.buffer_to_word(decoded)
+            data += Invoice.int_to_array(decoded.size + 1)
+            data << type
+            data += decoded
+          end
+        end
+        if routing_info && !routing_info.empty?
+          # data += [3]
+        end
+        data += Invoice.buffer_to_word(signature)
+        Bech32.encode(human, data)
+      end
+      
+      def fallback_address_type(fallback_address)
+        address_types = {
+          'lnbc' => [0, 5],
+          'lntb' => [111, 196]
+        }
 
+        hrp, data = Bech32.decode(fallback_address)
+        if hrp
+          0
+        else
+          decoded = [Bitcoin::Base58.decode(fallback_address)].pack("H*").unpack("C*")
+          if decoded[0] == address_types[prefix][0]
+            17
+          elsif decoded[0] == address_types[prefix][1]
+            18
+          end
+        end
       end
     end
 
@@ -31,7 +112,7 @@ module Lightning
       prefix, amount, multiplier = parse_human_readable(human)
       message = Message.new
       message.prefix = prefix
-      message.amount = amount.to_i
+      message.amount = amount.to_i if !amount&.empty?
       message.multiplier = multiplier
       message.timestamp = to_int(data_part[0...7])
       tags = data_part[7...data_part.size - 104]
@@ -98,6 +179,11 @@ module Lightning
       end
       return buffer.pack("C*")
     end
+    
+    def self.buffer_to_word(buffer)
+      words = convert(buffer.unpack('C*'), 8, 5)
+      return words
+    end
 
     def self.convert(data, inbits, outbits)
       value = 0
@@ -116,7 +202,7 @@ module Lightning
       end
 
       if bits > 0
-        result << (value << (outbits - bits)) & max
+        result << ((value << (outbits - bits)) & max)
       end
 
       return result
@@ -126,6 +212,19 @@ module Lightning
       data.inject(0) do |i, sum|
         sum + (i << 5)
       end
+    end
+    
+    def self.int_to_array(i, bits = 5, padding = 2)
+      array = []
+      return [0] if i.nil? || i == 0
+      while i > 0
+        array << (i & (2**bits -1))
+        i = (i / (2**bits)).to_i
+      end
+      if padding > array.size
+        array += [0] * (padding - array.size)
+      end
+      array.reverse
     end
 
     def self.to_bytes(data)
