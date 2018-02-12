@@ -18,6 +18,12 @@ RSpec.describe Lightning::Invoice do
     let(:payment_hash) { '0001020304050607080900010203040506070809000102030405060708090102' }
     let(:description) { 'Please consider supporting this project' }
     let(:expiry) { 60 }
+    let(:routing_info) do
+      [
+        Lightning::Invoice::RoutingInfo.new('029e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255'.htb, '0102030405060708'.htb, 1, 20, 3),
+        Lightning::Invoice::RoutingInfo.new('039e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255'.htb, '030405060708090a'.htb, 2, 30, 4),
+      ]
+    end
     let(:signature) { '38ec6891345e204145be8a3a99de38e98a39d6a569434e1845c8af7205afcfcc7f425fcd1463e93c32881ead0d6e356d467ec8c02553f9aab15e5738b11f127f00' }
     let(:message) do
       Lightning::Invoice::Message.new.tap do |m|
@@ -29,6 +35,7 @@ RSpec.describe Lightning::Invoice do
         m.description = description
         m.expiry = expiry
         m.fallback_address = fallback_address
+        m.routing_info = routing_info
         m.signature = signature.htb
       end
     end

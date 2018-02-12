@@ -68,7 +68,7 @@ module Lightning
           case type
           when 0
             _, data_part = Bech32.decode(fallback_address)
-            data += Invoice.int_to_array(data_part.size + 1)
+            data += Invoice.int_to_array(data_part.size)
             data += data_part
           when 17, 18
             decoded = Bitcoin::Base58.decode(fallback_address)
@@ -80,7 +80,13 @@ module Lightning
           end
         end
         if routing_info && !routing_info.empty?
-          # data += [3]
+          data += [3]
+          data += Invoice.int_to_array(82 * routing_info.size)
+          tmp = []
+          routing_info.each do |r|
+            tmp += r.to_array
+          end
+          data += Invoice.buffer_to_word(tmp.pack("C*"))
         end
         data += Invoice.buffer_to_word(signature)
         Bech32.encode(human, data)
@@ -121,8 +127,8 @@ module Lightning
         type = tags[index]
         data_length = (tags[index + 1].to_i << 5) + tags[index + 2].to_i
         data = tags[index + 3 ... index + 3 + data_length]
-        index += 3 + data_length
         bytes = to_bytes(data)
+        index += 3 + data_length
         case type
         when 1
           message.payment_hash = bytes[0...64].pack("C*")
@@ -179,7 +185,7 @@ module Lightning
       end
       return buffer.pack("C*")
     end
-    
+
     def self.buffer_to_word(buffer)
       words = convert(buffer.unpack('C*'), 8, 5)
       return words
@@ -213,23 +219,25 @@ module Lightning
         sum + (i << 5)
       end
     end
-    
+
     def self.int_to_array(i, bits = 5, padding = 2)
       array = []
       return [0] if i.nil? || i == 0
       while i > 0
-        array << (i & (2**bits -1))
+        array << (i & (2**bits - 1))
         i = (i / (2**bits)).to_i
       end
+      "padding: #{padding}/#{array}"
       if padding > array.size
         array += [0] * (padding - array.size)
+        "padding!!!"
       end
       array.reverse
     end
 
     def self.to_bytes(data)
       buf = []
-      (data.size.*5).times do |i|
+      (data.size * 5).times do |i|
         loc5 = (i / 5).to_i
         loc8 = i >> 3
         if i % 8 == 0
