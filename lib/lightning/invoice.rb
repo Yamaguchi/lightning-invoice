@@ -133,7 +133,7 @@ module Lightning
         when 1
           message.payment_hash = bytes[0...64].pack("C*")
         when 13
-          message.description = bytes.pack("C*")
+          message.description = bytes.pack("C*").force_encoding('utf-8')
         when 19
           message.pubkey = bytes[0...66].pack("C*")
         when 23
@@ -227,10 +227,8 @@ module Lightning
         array << (i & (2**bits - 1))
         i = (i / (2**bits)).to_i
       end
-      "padding: #{padding}/#{array}"
       if padding > array.size
         array += [0] * (padding - array.size)
-        "padding!!!"
       end
       array.reverse
     end

@@ -12,7 +12,7 @@ module Lightning
       end
       
       def to_array
-        b = pubkey.unpack("C*") + 
+        pubkey.unpack("C*") + 
         short_channel_id.unpack("C*") +
         Invoice.int_to_array(fee_base_msat, 5, 4) +
         Invoice.int_to_array(fee_proportional_millionths, 5, 4) +
