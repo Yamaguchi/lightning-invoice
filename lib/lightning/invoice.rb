@@ -91,7 +91,7 @@ module Lightning
         data += Invoice.buffer_to_word(signature)
         Bech32.encode(human, data)
       end
-      
+
       def fallback_address_type(fallback_address)
         address_types = {
           'lnbc' => [0, 5],
@@ -147,7 +147,7 @@ module Lightning
           hex = address.pack("C*").unpack("H*").first
           case data[0]
           when 0
-            message.fallback_address = Bitcoin::Script.to_p2wpkh(hex).to_addr
+            message.fallback_address = Bitcoin::Script.to_p2wpkh(hex).addresses.first
           when 17
             message.fallback_address = Bitcoin.encode_base58_address(hex, Bitcoin.chain_params.address_version)
           when 18
@@ -197,7 +197,7 @@ module Lightning
       max = (1 << outbits) - 1
 
       result = []
-      n = data.length 
+      n = data.length
       n.times do |i|
         value = (value << inbits) | data[i]
         bits += inbits
