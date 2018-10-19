@@ -32,7 +32,7 @@ module Lightning
         if payment_hash
           data += [1]
           data += [1, 20]
-          data += Invoice.buffer_to_word(payment_hash)
+          data += Invoice.buffer_to_word(payment_hash.htb)
         end
         if description
           data += [13]
@@ -43,12 +43,12 @@ module Lightning
         if pubkey
           data += [19]
           data += [1, 21]
-          data += Invoice.buffer_to_word(pubkey)
+          data += Invoice.buffer_to_word(pubkey.htb)
         end
         if description_hash
           data += [23]
           data += [1, 20]
-          data += Invoice.buffer_to_word(description_hash)
+          data += Invoice.buffer_to_word(description_hash.htb)
         end
         if expiry && expiry != 3600
           data += [6]
@@ -88,7 +88,7 @@ module Lightning
           end
           data += Invoice.buffer_to_word(tmp.pack("C*"))
         end
-        data += Invoice.buffer_to_word(signature)
+        data += Invoice.buffer_to_word(signature.htb)
         Bech32.encode(human, data)
       end
 
@@ -131,13 +131,13 @@ module Lightning
         index += 3 + data_length
         case type
         when 1
-          message.payment_hash = bytes[0...64].pack("C*")
+          message.payment_hash = bytes[0...64].pack("C*").bth
         when 13
           message.description = bytes.pack("C*").force_encoding('utf-8')
         when 19
-          message.pubkey = bytes[0...66].pack("C*")
+          message.pubkey = bytes[0...66].pack("C*").bth
         when 23
-          message.description_hash = bytes[0...64].pack("C*")
+          message.description_hash = bytes[0...64].pack("C*").bth
         when 6
           message.expiry = to_int(data)
         when 24
@@ -158,8 +158,8 @@ module Lightning
           offset = 0
           while offset < bytes.size
             message.routing_info << Lightning::Invoice::RoutingInfo.new(
-              bytes[offset...offset + 33].pack("C*"),
-              bytes[offset + 33...offset + 41].pack("C*"),
+              bytes[offset...offset + 33].pack("C*").bth,
+              bytes[offset + 33...offset + 41].pack("C*").bth,
               to_int(bytes[offset + 41...offset + 45]),
               to_int(bytes[offset + 45...offset + 49]),
               to_int(bytes[offset + 49...offset + 51])
@@ -169,7 +169,7 @@ module Lightning
         else
         end
       end
-      message.signature = word_to_buffer(data_part[data_part.size - 104..-1], true)
+      message.signature = word_to_buffer(data_part[data_part.size - 104..-1], true).bth
       message
     end
 
