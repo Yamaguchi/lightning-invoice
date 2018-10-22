@@ -15,10 +15,6 @@ module Lightning
       attr_accessor :timestamp, :signature, :payment_hash, :description, :pubkey, :description_hash, :expiry, :min_final_cltv_expiry, :fallback_address, :routing_info
 
       def initialize
-        @amount = -1
-        @timestamp = 0
-        @expiry = 3600
-        @min_final_cltv_expiry = 9
         @routing_info = []
       end
 
@@ -29,40 +25,40 @@ module Lightning
         human << multiplier if multiplier
         data = []
         data += Invoice.int_to_array(timestamp)
-        if payment_hash
+        if payment_hash && !payment_hash.empty?
           data += [1]
           data += [1, 20]
           data += Invoice.buffer_to_word(payment_hash.htb)
         end
-        if description
+        if description && !description.empty?
           data += [13]
           description_word = Invoice.buffer_to_word(description)
           data += Invoice.int_to_array(description_word.size)
           data += description_word
         end
-        if pubkey
+        if pubkey && !pubkey.empty?
           data += [19]
           data += [1, 21]
           data += Invoice.buffer_to_word(pubkey.htb)
         end
-        if description_hash
+        if description_hash && !description_hash.empty?
           data += [23]
           data += [1, 20]
           data += Invoice.buffer_to_word(description_hash.htb)
         end
-        if expiry && expiry != 3600
+        if expiry
           data += [6]
           expiry_word = Invoice.int_to_array(expiry)
           data += Invoice.int_to_array(expiry_word.size)
           data += expiry_word
         end
-        if min_final_cltv_expiry && min_final_cltv_expiry != 9
+        if min_final_cltv_expiry
           data += [24]
           min_final_cltv_expiry_word = Invoice.int_to_array(min_final_cltv_expiry)
           data += Invoice.int_to_array(min_final_cltv_expiry_word.size)
           data += min_final_cltv_expiry_word
         end
-        if fallback_address
+        if fallback_address && !fallback_address.empty?
           data += [9]
           type = fallback_address_type(fallback_address)
           case type
@@ -123,53 +119,58 @@ module Lightning
       message.timestamp = to_int(data_part[0...7])
       tags = data_part[7...data_part.size - 104]
       index = 0
-      while index < tags.size
-        type = tags[index]
-        data_length = (tags[index + 1].to_i << 5) + tags[index + 2].to_i
-        data = tags[index + 3 ... index + 3 + data_length]
-        bytes = to_bytes(data)
-        index += 3 + data_length
-        case type
-        when 1
-          message.payment_hash = bytes[0...64].pack("C*").bth
-        when 13
-          message.description = bytes.pack("C*").force_encoding('utf-8')
-        when 19
-          message.pubkey = bytes[0...66].pack("C*").bth
-        when 23
-          message.description_hash = bytes[0...64].pack("C*").bth
-        when 6
-          message.expiry = to_int(data)
-        when 24
-          message.min_final_cltv_expiry = to_int(data)
-        when 9
-          address = to_bytes(data[1..-1])
-          hex = address.pack("C*").unpack("H*").first
-          case data[0]
-          when 0
-            message.fallback_address = Bitcoin::Script.to_p2wpkh(hex).addresses.first
-          when 17
-            message.fallback_address = Bitcoin.encode_base58_address(hex, Bitcoin.chain_params.address_version)
-          when 18
-            message.fallback_address = Bitcoin.encode_base58_address(hex, Bitcoin.chain_params.p2sh_version)
+      if tags
+        while index < tags.size
+          type = tags[index]
+          data_length = (tags[index + 1].to_i << 5) + tags[index + 2].to_i
+          data = tags[index + 3 ... index + 3 + data_length]
+          bytes = to_bytes(data)
+          index += 3 + data_length
+          case type
+          when 1
+            message.payment_hash = bytes[0...64].pack("C*").bth
+          when 13
+            message.description = bytes.pack("C*").force_encoding('utf-8')
+          when 19
+            message.pubkey = bytes[0...66].pack("C*").bth
+          when 23
+            message.description_hash = bytes[0...64].pack("C*").bth
+          when 6
+            message.expiry = to_int(data)
+          when 24
+            message.min_final_cltv_expiry = to_int(data)
+          when 9
+            address = to_bytes(data[1..-1])
+            hex = address.pack("C*").unpack("H*").first
+            case data[0]
+            when 0
+              message.fallback_address = Bitcoin::Script.to_p2wpkh(hex).addresses.first
+            when 17
+              message.fallback_address = Bitcoin.encode_base58_address(hex, Bitcoin.chain_params.address_version)
+            when 18
+              message.fallback_address = Bitcoin.encode_base58_address(hex, Bitcoin.chain_params.p2sh_version)
+            else
+            end
+          when 3
+            offset = 0
+            while offset < bytes.size
+              message.routing_info << Lightning::Invoice::RoutingInfo.new(
+                bytes[offset...offset + 33].pack("C*").bth,
+                bytes[offset + 33...offset + 41].pack("C*").bth,
+                to_int(bytes[offset + 41...offset + 45]),
+                to_int(bytes[offset + 45...offset + 49]),
+                to_int(bytes[offset + 49...offset + 51])
+              )
+              offset += 51
+            end
           else
           end
-        when 3
-          offset = 0
-          while offset < bytes.size
-            message.routing_info << Lightning::Invoice::RoutingInfo.new(
-              bytes[offset...offset + 33].pack("C*").bth,
-              bytes[offset + 33...offset + 41].pack("C*").bth,
-              to_int(bytes[offset + 41...offset + 45]),
-              to_int(bytes[offset + 45...offset + 49]),
-              to_int(bytes[offset + 49...offset + 51])
-            )
-            offset += 51
-          end
-        else
         end
       end
-      message.signature = word_to_buffer(data_part[data_part.size - 104..-1], true).bth
+      sig = data_part[data_part.size - 104..-1]
+      if sig
+        message.signature = word_to_buffer(sig).bth
+      end
       message
     end
 
@@ -177,21 +178,17 @@ module Lightning
       human.scan(/^([a-zA-Z]+)(\d*)([munp]?)$/)&.first
     end
 
-    def self.word_to_buffer(data, trim)
-      buffer = convert(data, 5, 8)
-
-      if trim && (data.size * 5 % 8 != 0)
-        buffer = buffer[0...-1]
-      end
+    def self.word_to_buffer(data)
+      buffer = convert(data, 5, 8, false)
       return buffer.pack("C*")
     end
 
     def self.buffer_to_word(buffer)
-      words = convert(buffer.unpack('C*'), 8, 5)
+      words = convert(buffer.unpack('C*'), 8, 5, true)
       return words
     end
 
-    def self.convert(data, inbits, outbits)
+    def self.convert(data, inbits, outbits, padding)
       value = 0
       bits = 0
       max = (1 << outbits) - 1
@@ -207,7 +204,7 @@ module Lightning
         end
       end
 
-      if bits > 0
+      if padding && bits > 0
         result << ((value << (outbits - bits)) & max)
       end
 
