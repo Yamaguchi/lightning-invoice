@@ -10,6 +10,35 @@ RSpec.describe Lightning::Invoice do
   end
   let(:network) { :mainnet }
 
+  describe '.msat_to_readable' do
+    subject { Lightning::Invoice.msat_to_readable(amount_msat) }
+
+    describe '1mBTC' do
+      let(:amount_msat) { 100_000_000_000 }
+      it { expect(subject).to eq [1, ''] }
+    end
+
+    describe '1uBTC' do
+      let(:amount_msat) { 100_000_000 }
+      it { expect(subject).to eq [1, 'm'] }
+    end
+
+    describe '1nBTC' do
+      let(:amount_msat) { 100_000 }
+      it { expect(subject).to eq [1, 'u'] }
+    end
+
+    describe '1pBTC' do
+      let(:amount_msat) { 100 }
+      it { expect(subject).to eq [1, 'n'] }
+    end
+
+    describe '1 milli satoshi' do
+      let(:amount_msat) { 1 }
+      it { expect(subject).to eq [10, 'p'] }
+    end
+  end
+
   describe '.to_bech32' do
     let(:prefix) { 'lnbc' }
     let(:amount) { 2500 }

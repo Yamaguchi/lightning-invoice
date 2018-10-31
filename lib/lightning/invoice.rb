@@ -174,6 +174,24 @@ module Lightning
       message
     end
 
+    def self.msat_to_readable(msat)
+      if msat >= 100_000_000_000
+        [(msat / 100_000_000_000).to_i, '']
+      elsif msat >= 100_000_000
+        [(msat / 100_000_000).to_i, 'm']
+      elsif msat >= 100_000
+        [(msat / 100_000).to_i, 'u']
+      elsif msat >= 100
+        [(msat  / 100).to_i, 'n']
+      elsif msat > 0
+        [(msat * 10).to_i, 'p']
+      elsif msat == 0
+        [0, '']
+      else
+        raise 'amount_msat should be greater than or equal to 0'
+      end
+    end
+
     def self.parse_human_readable(human)
       human.scan(/^([a-zA-Z]+)(\d*)([munp]?)$/)&.first
     end
