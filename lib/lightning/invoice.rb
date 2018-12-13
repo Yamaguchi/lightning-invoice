@@ -19,10 +19,53 @@ module Lightning
       end
 
       def to_bech32
+        human = to_human_string
+        data = to_data_array
+        data += Invoice.buffer_to_word(signature.htb)
+        Bech32.encode(human, data)
+      end
+
+      def fallback_address_type(fallback_address)
+        address_types = {
+          'lnbc' => [0, 5],
+          'lntb' => [111, 196]
+        }
+
+        hrp, data = Bech32.decode(fallback_address)
+        if hrp
+          0
+        else
+          decoded = [Bitcoin::Base58.decode(fallback_address)].pack("H*").unpack("C*")
+          if decoded[0] == address_types[prefix][0]
+            17
+          elsif decoded[0] == address_types[prefix][1]
+            18
+          end
+        end
+      end
+
+      def sign(key, recovery: '00')
+        human = to_human_string
+        data = to_data_array
+        sig_data = human.bth + Invoice.word_to_buffer(data).bth
+        sig_as_der = key.sign(Bitcoin.sha256(sig_data.htb))
+        sig = ECDSA::Format::SignatureDerString.decode(sig_as_der)
+        self.signature = sig.r.to_s(16).rjust(64, '0') + sig.s.to_s(16).rjust(64, '0')
+        self.signature += recovery
+        self
+      end
+
+      private
+
+      def to_human_string
         human = +''
         human << prefix
         human << amount.to_s if amount && amount > 0
         human << multiplier if multiplier
+        human
+      end
+
+      def to_data_array
         data = []
         data += Invoice.int_to_array(timestamp)
         if payment_hash && !payment_hash.empty?
@@ -84,27 +127,7 @@ module Lightning
           end
           data += Invoice.buffer_to_word(tmp.pack("C*"))
         end
-        data += Invoice.buffer_to_word(signature.htb)
-        Bech32.encode(human, data)
-      end
-
-      def fallback_address_type(fallback_address)
-        address_types = {
-          'lnbc' => [0, 5],
-          'lntb' => [111, 196]
-        }
-
-        hrp, data = Bech32.decode(fallback_address)
-        if hrp
-          0
-        else
-          decoded = [Bitcoin::Base58.decode(fallback_address)].pack("H*").unpack("C*")
-          if decoded[0] == address_types[prefix][0]
-            17
-          elsif decoded[0] == address_types[prefix][1]
-            18
-          end
-        end
+        data
       end
     end
 

@@ -39,7 +39,7 @@ RSpec.describe Lightning::Invoice do
     end
   end
 
-  describe '.to_bech32' do
+  describe '#to_bech32' do
     let(:prefix) { 'lnbc' }
     let(:amount) { 2500 }
     let(:multiplier) { 'm' }
@@ -86,6 +86,28 @@ RSpec.describe Lightning::Invoice do
       it { is_expected.to eq message.to_h }
     end
   end
+
+  describe '#sign' do
+    let(:prefix) { 'lnbc' }
+    let(:timestamp) { 1496314658 }
+    let(:payment_hash) { '0001020304050607080900010203040506070809000102030405060708090102' }
+    let(:description) { 'Please consider supporting this project' }
+    let(:signature) { '38ec6891345e204145be8a3a99de38e98a39d6a569434e1845c8af7205afcfcc7f425fcd1463e93c32881ead0d6e356d467ec8c02553f9aab15e5738b11f127f00' }
+    let(:message) do
+      Lightning::Invoice::Message.new.tap do |m|
+        m.prefix = prefix
+        m.timestamp = timestamp
+        m.payment_hash = payment_hash
+        m.description = description
+      end
+    end
+    let(:private_key) { Bitcoin::Key.new(priv_key: 'e126f68f7eafcc8b74f54d269fe206be715000f94dac067d1c04a8ca3b2db734') }
+
+    subject { message.sign(private_key) }
+
+    it { expect(subject.signature).to eq signature }
+  end
+
   describe '.parse' do
     let(:hash) do
       Bitcoin.sha256('One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon').bth
