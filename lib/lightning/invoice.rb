@@ -55,6 +55,11 @@ module Lightning
         self
       end
 
+      def ==(obj)
+        return false unless obj.is_a? Message
+        to_bech32 == obj.to_bech32
+      end
+
       private
 
       def to_human_string
